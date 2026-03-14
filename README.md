@@ -1,0 +1,1 @@
+# game-platform-joint-purchase-service
