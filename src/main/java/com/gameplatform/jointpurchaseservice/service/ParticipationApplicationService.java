@@ -5,8 +5,8 @@ import com.gameplatform.jointpurchaseservice.domain.entity.ParticipationApplicat
 import com.gameplatform.jointpurchaseservice.domain.enums.ParticipationApplicationStatus;
 import com.gameplatform.jointpurchaseservice.kafka.event.ParticipationApplicationSubmittedEvent;
 import com.gameplatform.jointpurchaseservice.kafka.producer.JointPurchaseEventProducer;
-import com.gameplatform.jointpurchaseservice.repository.JointPurchaseOfferRepository;
-import com.gameplatform.jointpurchaseservice.repository.ParticipationApplicationRepository;
+import com.gameplatform.jointpurchaseservice.repository.jpa.JointPurchaseOfferRepository;
+import com.gameplatform.jointpurchaseservice.repository.jpa.ParticipationApplicationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

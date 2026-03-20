@@ -1,5 +1,8 @@
 package com.gameplatform.jointpurchaseservice.configuration;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.gameplatform.jointpurchaseservice.kafka.event.ParticipationApplicationSubmittedEvent;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -23,10 +26,16 @@ public class KafkaProducerConfig {
         Map<String, Object> props = new HashMap<>(kafkaProperties.buildProducerProperties());
 
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+
+        ObjectMapper kafkaObjectMapper = new ObjectMapper();
+        kafkaObjectMapper.registerModule(new JavaTimeModule());
+        kafkaObjectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+        JsonSerializer<ParticipationApplicationSubmittedEvent> valueSerializer =
+                new JsonSerializer<>(kafkaObjectMapper);
 
         DefaultKafkaProducerFactory<String, ParticipationApplicationSubmittedEvent> producerFactory =
-                new DefaultKafkaProducerFactory<>(props);
+                new DefaultKafkaProducerFactory<>(props, new StringSerializer(), valueSerializer);
 
         return new KafkaTemplate<>(producerFactory);
     }

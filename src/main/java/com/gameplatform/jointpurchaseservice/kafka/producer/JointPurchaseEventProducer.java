@@ -18,17 +18,16 @@ public class JointPurchaseEventProducer {
     private String jointPurchaseEventsTopic;
 
     public void publishParticipationApplicationSubmitted(ParticipationApplicationSubmittedEvent event) {
-        log.info("!!! ПОПЫТКА ОТПРАВКИ В ТОПИК: {} !!!", jointPurchaseEventsTopic);
+        String key = event.getApplicantUserId().toString();
 
-        kafkaTemplate.send(jointPurchaseEventsTopic, event.getApplicantUserId().toString(), event)
+        kafkaTemplate.send(jointPurchaseEventsTopic, key, event)
                 .whenComplete((result, ex) -> {
-                    if (ex == null) {
-                        log.info("!!! ПОДТВЕРЖДЕНО: Сообщение в топике {}, partition {}, offset {}",
-                                result.getRecordMetadata().topic(),
-                                result.getRecordMetadata().partition(),
-                                result.getRecordMetadata().offset());
+                    if (ex != null) {
+                        log.error("Failed to send event to Kafka: topic={}, eventId={}",
+                                jointPurchaseEventsTopic, event.getEventId(), ex);
                     } else {
-                        log.error("!!! ОШИБКА КАФКИ: Сообщение НЕ отправлено !!!", ex);
+                        log.debug("Event sent successfully: topic={}, offset={}",
+                                jointPurchaseEventsTopic, result.getRecordMetadata().offset());
                     }
                 });
     }

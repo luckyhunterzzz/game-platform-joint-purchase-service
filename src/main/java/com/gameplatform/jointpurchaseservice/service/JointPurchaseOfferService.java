@@ -3,7 +3,7 @@ package com.gameplatform.jointpurchaseservice.service;
 import com.gameplatform.jointpurchaseservice.domain.entity.JointPurchaseOffer;
 import com.gameplatform.jointpurchaseservice.domain.enums.JointPurchaseOfferStatus;
 import com.gameplatform.jointpurchaseservice.dto.request.CreateJointPurchaseOfferRequestDto;
-import com.gameplatform.jointpurchaseservice.repository.JointPurchaseOfferRepository;
+import com.gameplatform.jointpurchaseservice.repository.jpa.JointPurchaseOfferRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
