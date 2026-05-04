@@ -37,24 +37,39 @@ public class JointPurchaseOffer {
     @Column(name = "description")
     private String description;
 
-    @Column(name = "alliance_name", nullable = false)
+    @Column(name = "alliance_name")
     private String allianceName;
 
     @Column(name = "required_participants", nullable = false)
     private Integer requiredParticipants;
 
+    @Column(name = "reserve_participants", nullable = false)
+    private Integer reserveParticipants;
+
     @Column(name = "current_participants", nullable = false)
-    private Integer currentParticipants;
+    private Integer currentMainParticipants;
+
+    @Column(name = "current_reserve_participants", nullable = false)
+    private Integer currentReserveParticipants;
+
+    @Column(name = "auto_approve_enabled", nullable = false)
+    private Boolean autoApproveEnabled;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private JointPurchaseOfferStatus status;
 
-    @Column(name = "purchase_window_start", nullable = false)
-    private OffsetDateTime purchaseWindowStart;
+    @Column(name = "planned_start_at", nullable = false)
+    private OffsetDateTime plannedStartAt;
 
-    @Column(name = "purchase_window_end", nullable = false)
-    private OffsetDateTime purchaseWindowEnd;
+    @Column(name = "planned_end_at", nullable = false)
+    private OffsetDateTime plannedEndAt;
+
+    @Column(name = "screenshot_bucket")
+    private String screenshotBucket;
+
+    @Column(name = "screenshot_object_key", length = 1024)
+    private String screenshotObjectKey;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
