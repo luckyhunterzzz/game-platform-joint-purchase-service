@@ -3,6 +3,7 @@ package com.gameplatform.jointpurchaseservice.configuration;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.gameplatform.jointpurchaseservice.kafka.event.JointPurchaseParticipantsEmailRequestedEvent;
 import com.gameplatform.jointpurchaseservice.kafka.event.ParticipationApplicationSubmittedEvent;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -23,20 +24,47 @@ public class KafkaProducerConfig {
     public KafkaTemplate<String, ParticipationApplicationSubmittedEvent> participationApplicationKafkaTemplate(
             KafkaProperties kafkaProperties
     ) {
-        Map<String, Object> props = new HashMap<>(kafkaProperties.buildProducerProperties());
-
-        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-
-        ObjectMapper kafkaObjectMapper = new ObjectMapper();
-        kafkaObjectMapper.registerModule(new JavaTimeModule());
-        kafkaObjectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-
+        ObjectMapper kafkaObjectMapper = buildKafkaObjectMapper();
         JsonSerializer<ParticipationApplicationSubmittedEvent> valueSerializer =
                 new JsonSerializer<>(kafkaObjectMapper);
 
         DefaultKafkaProducerFactory<String, ParticipationApplicationSubmittedEvent> producerFactory =
-                new DefaultKafkaProducerFactory<>(props, new StringSerializer(), valueSerializer);
+                new DefaultKafkaProducerFactory<>(
+                        buildProducerProperties(kafkaProperties),
+                        new StringSerializer(),
+                        valueSerializer
+                );
 
         return new KafkaTemplate<>(producerFactory);
+    }
+
+    @Bean
+    public KafkaTemplate<String, JointPurchaseParticipantsEmailRequestedEvent>
+    jointPurchaseParticipantsEmailRequestedKafkaTemplate(KafkaProperties kafkaProperties) {
+        ObjectMapper kafkaObjectMapper = buildKafkaObjectMapper();
+        JsonSerializer<JointPurchaseParticipantsEmailRequestedEvent> valueSerializer =
+                new JsonSerializer<>(kafkaObjectMapper);
+
+        DefaultKafkaProducerFactory<String, JointPurchaseParticipantsEmailRequestedEvent> producerFactory =
+                new DefaultKafkaProducerFactory<>(
+                        buildProducerProperties(kafkaProperties),
+                        new StringSerializer(),
+                        valueSerializer
+                );
+
+        return new KafkaTemplate<>(producerFactory);
+    }
+
+    private Map<String, Object> buildProducerProperties(KafkaProperties kafkaProperties) {
+        Map<String, Object> props = new HashMap<>(kafkaProperties.buildProducerProperties());
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        return props;
+    }
+
+    private ObjectMapper buildKafkaObjectMapper() {
+        ObjectMapper kafkaObjectMapper = new ObjectMapper();
+        kafkaObjectMapper.registerModule(new JavaTimeModule());
+        kafkaObjectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        return kafkaObjectMapper;
     }
 }

@@ -1,6 +1,8 @@
 package com.gameplatform.jointpurchaseservice.dto.response;
 
 import com.gameplatform.jointpurchaseservice.domain.enums.JointPurchaseOfferStatus;
+import com.gameplatform.jointpurchaseservice.domain.enums.ParticipationApplicationStatus;
+import com.gameplatform.jointpurchaseservice.domain.enums.ParticipationType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -22,11 +24,19 @@ public class JointPurchaseOfferResponseDto {
     private String title;
     private String description;
     private String allianceName;
+    private String screenshotBucket;
+    private String screenshotObjectKey;
+    private String screenshotUrl;
     private Integer requiredParticipants;
-    private Integer currentParticipants;
+    private Integer reserveParticipants;
+    private Integer currentMainParticipants;
+    private Integer currentReserveParticipants;
+    private ParticipationApplicationStatus currentUserApplicationStatus;
+    private ParticipationType currentUserAssignedParticipationType;
+    private Boolean autoApproveEnabled;
     private JointPurchaseOfferStatus status;
-    private OffsetDateTime purchaseWindowStart;
-    private OffsetDateTime purchaseWindowEnd;
+    private OffsetDateTime plannedStartAt;
+    private OffsetDateTime plannedEndAt;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

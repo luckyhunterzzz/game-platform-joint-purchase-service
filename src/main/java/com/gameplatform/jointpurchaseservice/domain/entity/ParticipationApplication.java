@@ -1,6 +1,7 @@
 package com.gameplatform.jointpurchaseservice.domain.entity;
 
 import com.gameplatform.jointpurchaseservice.domain.enums.ParticipationApplicationStatus;
+import com.gameplatform.jointpurchaseservice.domain.enums.ParticipationType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -37,6 +38,22 @@ public class ParticipationApplication {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
     private ParticipationApplicationStatus status;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "assigned_participation_type")
+    private ParticipationType assignedParticipationType;
+
+    @Column(name = "reviewed_by_user_id")
+    private UUID reviewedByUserId;
+
+    @Column(name = "reviewed_at")
+    private OffsetDateTime reviewedAt;
+
+    @Column(name = "screenshot_bucket")
+    private String screenshotBucket;
+
+    @Column(name = "screenshot_object_key", length = 1024)
+    private String screenshotObjectKey;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
