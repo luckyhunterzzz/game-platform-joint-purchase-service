@@ -16,6 +16,12 @@ app:
       player-profile-events: player-profile-events
       joint-purchase-events: joint-purchase-events
       trust-score-events: trust-score-events
+      notification-events: notification-events
+  services:
+    player-profile:
+      base-url: http://localhost:8083
+  minio:
+    public-base-url: ${APP_MINIO_PUBLIC_BASE_URL:http://localhost:9000}
 
 management:
   endpoints:

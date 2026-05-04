@@ -1,9 +1,13 @@
 package com.gameplatform.jointpurchaseservice.service;
 
 import com.gameplatform.jointpurchaseservice.domain.document.TrustScoreSnapshotDocument;
+import com.gameplatform.jointpurchaseservice.domain.entity.JointPurchaseOffer;
 import com.gameplatform.jointpurchaseservice.domain.entity.ParticipationApplication;
 import com.gameplatform.jointpurchaseservice.domain.enums.ParticipationApplicationStatus;
+import com.gameplatform.jointpurchaseservice.domain.enums.ParticipationType;
+import com.gameplatform.jointpurchaseservice.exception.ConflictException;
 import com.gameplatform.jointpurchaseservice.kafka.event.TrustScoreCalculatedEvent;
+import com.gameplatform.jointpurchaseservice.repository.jpa.JointPurchaseOfferRepository;
 import com.gameplatform.jointpurchaseservice.repository.jpa.ParticipationApplicationRepository;
 import com.gameplatform.jointpurchaseservice.repository.mongo.TrustScoreSnapshotMongoRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +24,9 @@ import java.time.OffsetDateTime;
 public class TrustScoreProcessingService {
 
     private final ParticipationApplicationRepository participationApplicationRepository;
+    private final JointPurchaseOfferRepository jointPurchaseOfferRepository;
     private final TrustScoreSnapshotMongoRepository trustScoreSnapshotMongoRepository;
+    private final ParticipationDecisionService participationDecisionService;
     private final Clock clock;
 
     @Transactional
@@ -29,16 +35,18 @@ public class TrustScoreProcessingService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Participation application not found: " + event.getApplicationId()
                 ));
+        JointPurchaseOffer offer = jointPurchaseOfferRepository.findById(event.getOfferId())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Joint purchase offer not found: " + event.getOfferId()
+                ));
 
         validateEventMatchesApplication(application, event);
 
-        ParticipationApplicationStatus newStatus = mapRecommendationToStatus(event.getRecommendation());
-
         OffsetDateTime now = OffsetDateTime.now(clock);
 
-        application.setStatus(newStatus);
-        application.setUpdatedAt(now);
+        applyRecommendation(offer, application, event.getRecommendation(), now);
 
+        jointPurchaseOfferRepository.save(offer);
         participationApplicationRepository.save(application);
 
         TrustScoreSnapshotDocument snapshotDocument = TrustScoreSnapshotDocument.builder()
@@ -62,7 +70,7 @@ public class TrustScoreProcessingService {
                 "Trust score processed successfully: applicationId={}, userId={}, newStatus={}, score={}, recommendation={}",
                 application.getId(),
                 application.getApplicantUserId(),
-                newStatus,
+                application.getStatus(),
                 event.getScore(),
                 event.getRecommendation()
         );
@@ -85,12 +93,50 @@ public class TrustScoreProcessingService {
         }
     }
 
-    private ParticipationApplicationStatus mapRecommendationToStatus(String recommendation) {
-        return switch (recommendation) {
-            case "APPROVE" -> ParticipationApplicationStatus.AUTO_APPROVED;
-            case "MANUAL_REVIEW" -> ParticipationApplicationStatus.MANUAL_REVIEW;
-            case "REJECT" -> ParticipationApplicationStatus.REJECTED;
+    private void applyRecommendation(
+            JointPurchaseOffer offer,
+            ParticipationApplication application,
+            String recommendation,
+            OffsetDateTime now
+    ) {
+        switch (recommendation) {
+            case "APPROVE" -> approveAutomatically(offer, application, now);
+            case "MANUAL_REVIEW" -> {
+                application.setStatus(ParticipationApplicationStatus.PENDING_ORGANIZER_REVIEW);
+                application.setUpdatedAt(now);
+            }
+            case "REJECT" -> {
+                application.setStatus(ParticipationApplicationStatus.REJECTED);
+                application.setUpdatedAt(now);
+            }
             default -> throw new IllegalArgumentException("Unsupported recommendation: " + recommendation);
-        };
+        }
+    }
+
+    private void approveAutomatically(
+            JointPurchaseOffer offer,
+            ParticipationApplication application,
+            OffsetDateTime now
+    ) {
+        if (offer.getCurrentMainParticipants() < offer.getRequiredParticipants()) {
+            try {
+                participationDecisionService.approveApplication(offer, application, ParticipationType.MAIN, null, now);
+                return;
+            } catch (ConflictException ignored) {
+                // Fallback to reserve or organizer review when applicant cannot be assigned to main automatically.
+            }
+        }
+
+        if (offer.getCurrentReserveParticipants() < offer.getReserveParticipants()) {
+            try {
+                participationDecisionService.approveApplication(offer, application, ParticipationType.RESERVE, null, now);
+                return;
+            } catch (ConflictException ignored) {
+                // Fallback to organizer review when reserve assignment is also not possible.
+            }
+        }
+
+        application.setStatus(ParticipationApplicationStatus.PENDING_ORGANIZER_REVIEW);
+        application.setUpdatedAt(now);
     }
 }

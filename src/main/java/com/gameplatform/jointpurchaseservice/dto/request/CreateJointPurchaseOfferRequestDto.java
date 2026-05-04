@@ -31,15 +31,27 @@ public class CreateJointPurchaseOfferRequestDto {
     @Size(max = 150)
     private String allianceName;
 
+    private String screenshotBucket;
+
+    @Size(max = 1024)
+    private String screenshotObjectKey;
+
     @NotNull
     @Min(1)
     private Integer requiredParticipants;
 
     @NotNull
-    @Future
-    private OffsetDateTime purchaseWindowStart;
+    @Min(0)
+    private Integer reserveParticipants;
+
+    @NotNull
+    private Boolean autoApproveEnabled;
 
     @NotNull
     @Future
-    private OffsetDateTime purchaseWindowEnd;
+    private OffsetDateTime plannedStartAt;
+
+    @NotNull
+    @Future
+    private OffsetDateTime plannedEndAt;
 }
