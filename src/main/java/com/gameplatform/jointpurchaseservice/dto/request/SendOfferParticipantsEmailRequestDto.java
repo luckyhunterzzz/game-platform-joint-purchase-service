@@ -22,4 +22,8 @@ public class SendOfferParticipantsEmailRequestDto {
     @NotBlank(message = "must not be blank")
     @Size(max = 5000, message = "must not exceed 5000 characters")
     private String message;
+
+    private Boolean sendToMain;
+
+    private Boolean sendToReserve;
 }

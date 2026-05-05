@@ -2,6 +2,7 @@ package com.gameplatform.jointpurchaseservice.service;
 
 import com.gameplatform.jointpurchaseservice.domain.entity.JointPurchaseOffer;
 import com.gameplatform.jointpurchaseservice.domain.entity.JointPurchaseParticipant;
+import com.gameplatform.jointpurchaseservice.domain.enums.ParticipationType;
 import com.gameplatform.jointpurchaseservice.domain.enums.JointPurchaseParticipantStatus;
 import com.gameplatform.jointpurchaseservice.dto.request.SendOfferParticipantsEmailRequestDto;
 import com.gameplatform.jointpurchaseservice.dto.response.OfferParticipantsEmailResponseDto;
@@ -46,6 +47,13 @@ public class JointPurchaseNotificationService {
             throw new ForbiddenException("Only the creator can notify offer participants");
         }
 
+        boolean sendToMain = Boolean.TRUE.equals(requestDto.getSendToMain());
+        boolean sendToReserve = Boolean.TRUE.equals(requestDto.getSendToReserve());
+
+        if (!sendToMain && !sendToReserve) {
+            throw new BadRequestException("At least one recipient group must be selected");
+        }
+
         List<JointPurchaseParticipant> participants =
                 jointPurchaseParticipantRepository.findAllByOfferIdAndStatusOrderByJoinedAtAsc(
                         offerId,
@@ -59,6 +67,14 @@ public class JointPurchaseNotificationService {
         List<EmailNotificationRecipientEvent> recipients = new ArrayList<>();
 
         for (JointPurchaseParticipant participant : participants) {
+            if (participant.getParticipationType() == ParticipationType.MAIN && !sendToMain) {
+                continue;
+            }
+
+            if (participant.getParticipationType() == ParticipationType.RESERVE && !sendToReserve) {
+                continue;
+            }
+
             PlayerProfileResponse profile = playerProfileClient.getProfileByUserId(participant.getUserId());
 
             if (profile.email() == null || profile.email().isBlank()) {
