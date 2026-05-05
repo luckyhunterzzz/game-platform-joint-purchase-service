@@ -2,8 +2,10 @@ package com.gameplatform.jointpurchaseservice.service;
 
 import com.gameplatform.jointpurchaseservice.domain.entity.JointPurchaseOffer;
 import com.gameplatform.jointpurchaseservice.domain.entity.JointPurchaseParticipant;
+import com.gameplatform.jointpurchaseservice.domain.entity.ParticipationApplication;
 import com.gameplatform.jointpurchaseservice.domain.enums.JointPurchaseOfferStatus;
 import com.gameplatform.jointpurchaseservice.domain.enums.JointPurchaseParticipantStatus;
+import com.gameplatform.jointpurchaseservice.domain.enums.ParticipationApplicationStatus;
 import com.gameplatform.jointpurchaseservice.dto.request.CreateJointPurchaseOfferRequestDto;
 import com.gameplatform.jointpurchaseservice.exception.BadRequestException;
 import com.gameplatform.jointpurchaseservice.exception.ConflictException;
@@ -13,14 +15,18 @@ import com.gameplatform.jointpurchaseservice.integration.playerprofile.PlayerPro
 import com.gameplatform.jointpurchaseservice.integration.playerprofile.PlayerProfileResponse;
 import com.gameplatform.jointpurchaseservice.repository.jpa.JointPurchaseParticipantRepository;
 import com.gameplatform.jointpurchaseservice.repository.jpa.JointPurchaseOfferRepository;
+import com.gameplatform.jointpurchaseservice.repository.jpa.ParticipationApplicationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -36,6 +42,7 @@ public class JointPurchaseOfferService {
 
     private final JointPurchaseOfferRepository jointPurchaseOfferRepository;
     private final JointPurchaseParticipantRepository jointPurchaseParticipantRepository;
+    private final ParticipationApplicationRepository participationApplicationRepository;
     private final ParticipantFeedbackService participantFeedbackService;
     private final PlayerProfileClient playerProfileClient;
     private final Clock clock;
@@ -91,9 +98,49 @@ public class JointPurchaseOfferService {
 
     @Transactional(readOnly = true)
     public List<JointPurchaseOffer> getOpenOffers() {
-        return jointPurchaseOfferRepository.findAllByStatusOrderByCreatedAtDesc(
-                JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS
+        return jointPurchaseOfferRepository.findAllByStatusInOrderByCreatedAtDesc(
+                List.of(
+                        JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS,
+                        JointPurchaseOfferStatus.MAIN_GROUP_FILLED
+                )
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<JointPurchaseOffer> getVisibleOffers(UUID currentUserId) {
+        List<JointPurchaseOffer> openOffers = getOpenOffers();
+        if (currentUserId == null) {
+            return openOffers;
+        }
+
+        List<ParticipationApplication> approvedApplications =
+                participationApplicationRepository.findAllByApplicantUserIdAndStatusIn(
+                        currentUserId,
+                        List.of(
+                                ParticipationApplicationStatus.APPROVED_MAIN,
+                                ParticipationApplicationStatus.APPROVED_RESERVE
+                        )
+                );
+
+        if (approvedApplications.isEmpty()) {
+            return openOffers;
+        }
+
+        List<UUID> participantOfferIds = approvedApplications.stream()
+                .map(ParticipationApplication::getOfferId)
+                .distinct()
+                .toList();
+
+        List<JointPurchaseOffer> participantOffers =
+                jointPurchaseOfferRepository.findAllByIdInOrderByCreatedAtDesc(participantOfferIds);
+
+        Map<UUID, JointPurchaseOffer> offersById = new LinkedHashMap<>();
+        openOffers.forEach(offer -> offersById.put(offer.getId(), offer));
+        participantOffers.forEach(offer -> offersById.put(offer.getId(), offer));
+
+        return offersById.values().stream()
+                .sorted(Comparator.comparing(JointPurchaseOffer::getCreatedAt).reversed())
+                .toList();
     }
 
     @Transactional

@@ -174,6 +174,20 @@ public class JointPurchaseOfferFacade {
         );
     }
 
+    public ParticipationApplicationResponseDto cancelApprovedApplication(
+            UUID organizerUserId,
+            UUID offerId,
+            UUID applicationId
+    ) {
+        return participationApplicationMapper.toResponseDto(
+                participationApplicationService.cancelApprovedApplication(
+                        organizerUserId,
+                        offerId,
+                        applicationId
+                )
+        );
+    }
+
     public List<ParticipantFeedbackResponseDto> getOfferFeedback(UUID organizerUserId, UUID offerId) {
         return participantFeedbackService.getOfferFeedback(organizerUserId, offerId).stream()
                 .map(participantFeedbackMapper::toResponseDto)

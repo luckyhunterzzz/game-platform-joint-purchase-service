@@ -156,6 +156,17 @@ public class JointPurchaseOfferController {
         );
     }
 
+    @DeleteMapping("/{offerId}/applications/{applicationId}")
+    public ResponseEntity<ParticipationApplicationResponseDto> cancelApprovedApplication(
+            @RequestHeader(HeaderNames.USER_ID) UUID organizerUserId,
+            @PathVariable UUID offerId,
+            @PathVariable UUID applicationId
+    ) {
+        return ResponseEntity.ok(
+                jointPurchaseOfferFacade.cancelApprovedApplication(organizerUserId, offerId, applicationId)
+        );
+    }
+
     @GetMapping("/{offerId}/feedback")
     public ResponseEntity<List<ParticipantFeedbackResponseDto>> getOfferFeedback(
             @RequestHeader(HeaderNames.USER_ID) UUID organizerUserId,
