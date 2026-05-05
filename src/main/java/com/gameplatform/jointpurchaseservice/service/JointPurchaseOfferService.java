@@ -10,6 +10,7 @@ import com.gameplatform.jointpurchaseservice.exception.ConflictException;
 import com.gameplatform.jointpurchaseservice.exception.ForbiddenException;
 import com.gameplatform.jointpurchaseservice.exception.NotFoundException;
 import com.gameplatform.jointpurchaseservice.integration.playerprofile.PlayerProfileClient;
+import com.gameplatform.jointpurchaseservice.integration.playerprofile.PlayerProfileResponse;
 import com.gameplatform.jointpurchaseservice.repository.jpa.JointPurchaseParticipantRepository;
 import com.gameplatform.jointpurchaseservice.repository.jpa.JointPurchaseOfferRepository;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,7 @@ public class JointPurchaseOfferService {
     ) {
         validatePlannedWindow(requestDto);
         validateOrganizerCanCreateOffer(organizerUserId, organizerEmail, organizerRoles);
+        validateOrganizerContactPreferences(organizerUserId, requestDto);
 
         OffsetDateTime now = OffsetDateTime.now(clock);
 
@@ -58,6 +60,11 @@ public class JointPurchaseOfferService {
                 .description(requestDto.getDescription())
                 .allianceName(requestDto.getAllianceName())
                 .contactGroup(requestDto.getContactGroup())
+                .showOrganizerContacts(requestDto.getShowOrganizerContacts())
+                .showOrganizerGameNickname(requestDto.getShowOrganizerContacts() && requestDto.getShowOrganizerGameNickname())
+                .showOrganizerTelegram(requestDto.getShowOrganizerContacts() && requestDto.getShowOrganizerTelegram())
+                .showOrganizerVk(requestDto.getShowOrganizerContacts() && requestDto.getShowOrganizerVk())
+                .showOrganizerDiscord(requestDto.getShowOrganizerContacts() && requestDto.getShowOrganizerDiscord())
                 .screenshotBucket(requestDto.getScreenshotBucket())
                 .screenshotObjectKey(requestDto.getScreenshotObjectKey())
                 .requiredParticipants(requestDto.getRequiredParticipants())
@@ -122,6 +129,47 @@ public class JointPurchaseOfferService {
         if (requestDto.getPlannedEndAt().isBefore(requestDto.getPlannedStartAt())
                 || requestDto.getPlannedEndAt().isEqual(requestDto.getPlannedStartAt())) {
             throw new BadRequestException("plannedEndAt must be after plannedStartAt");
+        }
+    }
+
+    private void validateOrganizerContactPreferences(
+            UUID organizerUserId,
+            CreateJointPurchaseOfferRequestDto requestDto
+    ) {
+        if (!Boolean.TRUE.equals(requestDto.getShowOrganizerContacts())) {
+            return;
+        }
+
+        boolean hasSelectedAnyContact =
+                Boolean.TRUE.equals(requestDto.getShowOrganizerGameNickname())
+                        || Boolean.TRUE.equals(requestDto.getShowOrganizerTelegram())
+                        || Boolean.TRUE.equals(requestDto.getShowOrganizerVk())
+                        || Boolean.TRUE.equals(requestDto.getShowOrganizerDiscord());
+
+        if (!hasSelectedAnyContact) {
+            throw new BadRequestException("At least one organizer contact field must be selected");
+        }
+
+        PlayerProfileResponse organizerProfile = playerProfileClient.getProfileByUserId(organizerUserId);
+
+        if (Boolean.TRUE.equals(requestDto.getShowOrganizerGameNickname())
+                && (organizerProfile.currentGameNickname() == null || organizerProfile.currentGameNickname().isBlank())) {
+            throw new BadRequestException("Organizer game nickname is not available");
+        }
+
+        if (Boolean.TRUE.equals(requestDto.getShowOrganizerTelegram())
+                && (organizerProfile.telegramUsername() == null || organizerProfile.telegramUsername().isBlank())) {
+            throw new BadRequestException("Organizer Telegram username is not available");
+        }
+
+        if (Boolean.TRUE.equals(requestDto.getShowOrganizerVk())
+                && (organizerProfile.vkUsername() == null || organizerProfile.vkUsername().isBlank())) {
+            throw new BadRequestException("Organizer VK username is not available");
+        }
+
+        if (Boolean.TRUE.equals(requestDto.getShowOrganizerDiscord())
+                && (organizerProfile.discordUsername() == null || organizerProfile.discordUsername().isBlank())) {
+            throw new BadRequestException("Organizer Discord username is not available");
         }
     }
 

@@ -43,6 +43,21 @@ public class JointPurchaseOffer {
     @Column(name = "contact_group")
     private String contactGroup;
 
+    @Column(name = "show_organizer_contacts", nullable = false)
+    private Boolean showOrganizerContacts;
+
+    @Column(name = "show_organizer_game_nickname", nullable = false)
+    private Boolean showOrganizerGameNickname;
+
+    @Column(name = "show_organizer_telegram", nullable = false)
+    private Boolean showOrganizerTelegram;
+
+    @Column(name = "show_organizer_vk", nullable = false)
+    private Boolean showOrganizerVk;
+
+    @Column(name = "show_organizer_discord", nullable = false)
+    private Boolean showOrganizerDiscord;
+
     @Column(name = "required_participants", nullable = false)
     private Integer requiredParticipants;
 

@@ -204,6 +204,29 @@ public class JointPurchaseOfferFacade {
                 offer.getScreenshotBucket(),
                 offer.getScreenshotObjectKey()
         ));
+
+        if (Boolean.TRUE.equals(offer.getShowOrganizerContacts())) {
+            try {
+                PlayerProfileResponse organizerProfile = playerProfileClient.getProfileByUserId(offer.getOrganizerUserId());
+                responseDto.setOrganizerGameNickname(
+                        Boolean.TRUE.equals(offer.getShowOrganizerGameNickname()) ? organizerProfile.currentGameNickname() : null
+                );
+                responseDto.setOrganizerTelegramUsername(
+                        Boolean.TRUE.equals(offer.getShowOrganizerTelegram()) ? organizerProfile.telegramUsername() : null
+                );
+                responseDto.setOrganizerVkUsername(
+                        Boolean.TRUE.equals(offer.getShowOrganizerVk()) ? organizerProfile.vkUsername() : null
+                );
+                responseDto.setOrganizerDiscordUsername(
+                        Boolean.TRUE.equals(offer.getShowOrganizerDiscord()) ? organizerProfile.discordUsername() : null
+                );
+            } catch (RuntimeException ignored) {
+                responseDto.setOrganizerGameNickname(null);
+                responseDto.setOrganizerTelegramUsername(null);
+                responseDto.setOrganizerVkUsername(null);
+                responseDto.setOrganizerDiscordUsername(null);
+            }
+        }
         return responseDto;
     }
 }

@@ -25,6 +25,11 @@ public class JointPurchaseOfferResponseDto {
     private String description;
     private String allianceName;
     private String contactGroup;
+    private Boolean showOrganizerContacts;
+    private String organizerGameNickname;
+    private String organizerTelegramUsername;
+    private String organizerVkUsername;
+    private String organizerDiscordUsername;
     private String screenshotBucket;
     private String screenshotObjectKey;
     private String screenshotUrl;
