@@ -40,6 +40,9 @@ public class JointPurchaseOffer {
     @Column(name = "alliance_name")
     private String allianceName;
 
+    @Column(name = "contact_group")
+    private String contactGroup;
+
     @Column(name = "required_participants", nullable = false)
     private Integer requiredParticipants;
 

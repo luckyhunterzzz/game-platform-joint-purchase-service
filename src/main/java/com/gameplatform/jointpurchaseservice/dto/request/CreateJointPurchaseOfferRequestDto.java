@@ -31,6 +31,10 @@ public class CreateJointPurchaseOfferRequestDto {
     @Size(max = 150)
     private String allianceName;
 
+    @NotBlank
+    @Size(max = 150)
+    private String contactGroup;
+
     private String screenshotBucket;
 
     @Size(max = 1024)

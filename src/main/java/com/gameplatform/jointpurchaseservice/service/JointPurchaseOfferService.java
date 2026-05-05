@@ -57,6 +57,7 @@ public class JointPurchaseOfferService {
                 .title(requestDto.getTitle())
                 .description(requestDto.getDescription())
                 .allianceName(requestDto.getAllianceName())
+                .contactGroup(requestDto.getContactGroup())
                 .screenshotBucket(requestDto.getScreenshotBucket())
                 .screenshotObjectKey(requestDto.getScreenshotObjectKey())
                 .requiredParticipants(requestDto.getRequiredParticipants())

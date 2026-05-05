@@ -24,6 +24,7 @@ public class JointPurchaseOfferResponseDto {
     private String title;
     private String description;
     private String allianceName;
+    private String contactGroup;
     private String screenshotBucket;
     private String screenshotObjectKey;
     private String screenshotUrl;
