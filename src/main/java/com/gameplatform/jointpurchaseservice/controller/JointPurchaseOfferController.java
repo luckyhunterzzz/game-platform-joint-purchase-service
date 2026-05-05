@@ -53,6 +53,15 @@ public class JointPurchaseOfferController {
         return ResponseEntity.ok(jointPurchaseOfferFacade.getOrganizerOffers(organizerUserId));
     }
 
+    @PutMapping("/{offerId}")
+    public ResponseEntity<JointPurchaseOfferResponseDto> updateOffer(
+            @RequestHeader(HeaderNames.USER_ID) UUID organizerUserId,
+            @PathVariable UUID offerId,
+            @Valid @RequestBody CreateJointPurchaseOfferRequestDto requestDto
+    ) {
+        return ResponseEntity.ok(jointPurchaseOfferFacade.updateOffer(organizerUserId, offerId, requestDto));
+    }
+
     @PatchMapping("/{offerId}/status")
     public ResponseEntity<JointPurchaseOfferResponseDto> updateOfferStatus(
             @RequestHeader(HeaderNames.USER_ID) UUID organizerUserId,

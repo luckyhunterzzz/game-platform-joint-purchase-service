@@ -65,6 +65,19 @@ public class JointPurchaseOfferFacade {
                 .toList();
     }
 
+    public JointPurchaseOfferResponseDto updateOffer(
+            UUID organizerUserId,
+            UUID offerId,
+            CreateJointPurchaseOfferRequestDto requestDto
+    ) {
+        JointPurchaseOffer offer = jointPurchaseOfferService.updateOffer(
+                organizerUserId,
+                offerId,
+                requestDto
+        );
+        return enrichOfferResponse(jointPurchaseOfferMapper.toResponseDto(offer), offer);
+    }
+
     public JointPurchaseOfferResponseDto updateOfferStatus(
             UUID organizerUserId,
             UUID offerId,

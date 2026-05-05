@@ -10,12 +10,16 @@ import com.gameplatform.jointpurchaseservice.domain.enums.ParticipationType;
 import com.gameplatform.jointpurchaseservice.exception.ConflictException;
 import com.gameplatform.jointpurchaseservice.repository.jpa.JointPurchaseOfferRepository;
 import com.gameplatform.jointpurchaseservice.repository.jpa.JointPurchaseParticipantRepository;
+import com.gameplatform.jointpurchaseservice.repository.jpa.ParticipationApplicationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +34,7 @@ public class ParticipationDecisionService {
 
     private final JointPurchaseParticipantRepository jointPurchaseParticipantRepository;
     private final JointPurchaseOfferRepository jointPurchaseOfferRepository;
+    private final ParticipationApplicationRepository participationApplicationRepository;
 
     public void approveApplication(
             JointPurchaseOffer offer,
@@ -59,6 +64,7 @@ public class ParticipationDecisionService {
         application.setUpdatedAt(now);
 
         if (participationType == ParticipationType.MAIN) {
+            releaseOtherReserveParticipations(application.getApplicantUserId(), offer.getId(), reviewerUserId, now);
             offer.setCurrentMainParticipants(offer.getCurrentMainParticipants() + 1);
             application.setStatus(ParticipationApplicationStatus.APPROVED_MAIN);
 
@@ -98,6 +104,7 @@ public class ParticipationDecisionService {
 
         if (targetType == ParticipationType.MAIN) {
             validateMoveToMain(offer, application);
+            releaseOtherReserveParticipations(application.getApplicantUserId(), offer.getId(), reviewerUserId, now);
             offer.setCurrentReserveParticipants(Math.max(0, offer.getCurrentReserveParticipants() - 1));
             offer.setCurrentMainParticipants(offer.getCurrentMainParticipants() + 1);
             participant.setParticipationType(ParticipationType.MAIN);
@@ -233,6 +240,58 @@ public class ParticipationDecisionService {
                 });
 
         jointPurchaseParticipantRepository.saveAll(staleParticipations);
+    }
+
+    private void releaseOtherReserveParticipations(
+            UUID userId,
+            UUID currentOfferId,
+            UUID reviewerUserId,
+            OffsetDateTime now
+    ) {
+        List<JointPurchaseParticipant> reserveParticipations = jointPurchaseParticipantRepository
+                .findAllByUserIdAndParticipationTypeAndStatus(
+                        userId,
+                        ParticipationType.RESERVE,
+                        JointPurchaseParticipantStatus.ACTIVE
+                ).stream()
+                .filter(participant -> !participant.getOfferId().equals(currentOfferId))
+                .toList();
+
+        if (reserveParticipations.isEmpty()) {
+            return;
+        }
+
+        Map<UUID, JointPurchaseOffer> offersById = jointPurchaseOfferRepository.findAllById(
+                reserveParticipations.stream().map(JointPurchaseParticipant::getOfferId).distinct().toList()
+        ).stream().collect(Collectors.toMap(JointPurchaseOffer::getId, Function.identity()));
+
+        List<ParticipationApplication> reserveApplications = participationApplicationRepository.findAllById(
+                reserveParticipations.stream().map(JointPurchaseParticipant::getApplicationId).toList()
+        );
+
+        reserveApplications.forEach(application -> {
+            application.setStatus(ParticipationApplicationStatus.CANCELLED);
+            application.setReviewedByUserId(reviewerUserId);
+            application.setReviewedAt(now);
+            application.setUpdatedAt(now);
+        });
+
+        reserveParticipations.forEach(participant -> {
+            participant.setStatus(JointPurchaseParticipantStatus.REMOVED);
+            participant.setUpdatedAt(now);
+
+            JointPurchaseOffer affectedOffer = offersById.get(participant.getOfferId());
+            if (affectedOffer != null) {
+                affectedOffer.setCurrentReserveParticipants(
+                        Math.max(0, affectedOffer.getCurrentReserveParticipants() - 1)
+                );
+                affectedOffer.setUpdatedAt(now);
+            }
+        });
+
+        participationApplicationRepository.saveAll(reserveApplications);
+        jointPurchaseParticipantRepository.saveAll(reserveParticipations);
+        jointPurchaseOfferRepository.saveAll(offersById.values());
     }
 
     private JointPurchaseParticipantStatus resolveReleasedStatus(

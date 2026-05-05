@@ -26,6 +26,10 @@ public class JointPurchaseOfferResponseDto {
     private String allianceName;
     private String contactGroup;
     private Boolean showOrganizerContacts;
+    private Boolean showOrganizerGameNickname;
+    private Boolean showOrganizerTelegram;
+    private Boolean showOrganizerVk;
+    private Boolean showOrganizerDiscord;
     private String organizerGameNickname;
     private String organizerTelegramUsername;
     private String organizerVkUsername;

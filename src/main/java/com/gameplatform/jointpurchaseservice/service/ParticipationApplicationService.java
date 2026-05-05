@@ -36,6 +36,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ParticipationApplicationService {
 
+    private static final List<ParticipationApplicationStatus> ACTIVE_APPLICATION_STATUSES = List.of(
+            ParticipationApplicationStatus.PENDING_TRUST_CHECK,
+            ParticipationApplicationStatus.PENDING_ORGANIZER_REVIEW,
+            ParticipationApplicationStatus.APPROVED_MAIN,
+            ParticipationApplicationStatus.APPROVED_RESERVE
+    );
+
     private final ParticipationApplicationRepository participationApplicationRepository;
     private final JointPurchaseOfferRepository jointPurchaseOfferRepository;
     private final JointPurchaseParticipantRepository jointPurchaseParticipantRepository;
@@ -65,7 +72,11 @@ public class ParticipationApplicationService {
             throw new ForbiddenException("Organizer cannot participate in their own joint purchase");
         }
 
-        if (participationApplicationRepository.existsByOfferIdAndApplicantUserId(offerId, applicantUserId)) {
+        if (participationApplicationRepository.existsByOfferIdAndApplicantUserIdAndStatusIn(
+                offerId,
+                applicantUserId,
+                ACTIVE_APPLICATION_STATUSES
+        )) {
             throw new ConflictException("Application already exists for this user and offer");
         }
 
@@ -79,6 +90,18 @@ public class ParticipationApplicationService {
                 )
         )) {
             throw new ConflictException("Organizer cannot participate while having an active joint purchase offer");
+        }
+
+        if (jointPurchaseParticipantRepository.existsByUserIdInActiveMainOffers(
+                applicantUserId,
+                List.of(
+                        JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS.name(),
+                        JointPurchaseOfferStatus.MAIN_GROUP_FILLED.name(),
+                        JointPurchaseOfferStatus.READY_TO_START.name(),
+                        JointPurchaseOfferStatus.IN_PROGRESS.name()
+                )
+        )) {
+            throw new ConflictException("User already has active MAIN participation");
         }
 
         if (!playerProfileClient.isProfileComplete(applicantUserId, applicantEmail)) {
@@ -131,7 +154,11 @@ public class ParticipationApplicationService {
 
     @Transactional(readOnly = true)
     public ParticipationApplication getCurrentUserApplication(UUID offerId, UUID applicantUserId) {
-        return participationApplicationRepository.findByOfferIdAndApplicantUserId(offerId, applicantUserId)
+        return participationApplicationRepository.findFirstByOfferIdAndApplicantUserIdAndStatusInOrderByUpdatedAtDesc(
+                        offerId,
+                        applicantUserId,
+                        ACTIVE_APPLICATION_STATUSES
+                )
                 .orElse(null);
     }
 

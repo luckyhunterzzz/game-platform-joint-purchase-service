@@ -103,7 +103,12 @@ public class JointPurchaseOfferService {
                         JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS,
                         JointPurchaseOfferStatus.MAIN_GROUP_FILLED
                 )
-        );
+        ).stream()
+                .filter(offer ->
+                        offer.getStatus() == JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS
+                                || offer.getCurrentReserveParticipants() < offer.getReserveParticipants()
+                )
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -163,6 +168,54 @@ public class JointPurchaseOfferService {
 
         completeOrReleaseParticipantsIfNeeded(offer, targetStatus);
         offer.setStatus(targetStatus);
+        offer.setUpdatedAt(OffsetDateTime.now(clock));
+
+        return jointPurchaseOfferRepository.save(offer);
+    }
+
+    @Transactional
+    public JointPurchaseOffer updateOffer(
+            UUID organizerUserId,
+            UUID offerId,
+            CreateJointPurchaseOfferRequestDto requestDto
+    ) {
+        JointPurchaseOffer offer = getOfferOrThrow(offerId);
+
+        if (!offer.getOrganizerUserId().equals(organizerUserId)) {
+            throw new ForbiddenException("Only the creator can edit the offer");
+        }
+
+        if (offer.getStatus() != JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS) {
+            throw new ConflictException("Offer can be edited only while applications are open");
+        }
+
+        validatePlannedWindow(requestDto);
+        validateOrganizerContactPreferences(organizerUserId, requestDto);
+
+        if (requestDto.getRequiredParticipants() < offer.getCurrentMainParticipants()) {
+            throw new BadRequestException("requiredParticipants cannot be lower than current main participants");
+        }
+
+        if (requestDto.getReserveParticipants() < offer.getCurrentReserveParticipants()) {
+            throw new BadRequestException("reserveParticipants cannot be lower than current reserve participants");
+        }
+
+        offer.setTitle(requestDto.getTitle());
+        offer.setDescription(requestDto.getDescription());
+        offer.setAllianceName(requestDto.getAllianceName());
+        offer.setContactGroup(requestDto.getContactGroup());
+        offer.setShowOrganizerContacts(requestDto.getShowOrganizerContacts());
+        offer.setShowOrganizerGameNickname(requestDto.getShowOrganizerContacts() && requestDto.getShowOrganizerGameNickname());
+        offer.setShowOrganizerTelegram(requestDto.getShowOrganizerContacts() && requestDto.getShowOrganizerTelegram());
+        offer.setShowOrganizerVk(requestDto.getShowOrganizerContacts() && requestDto.getShowOrganizerVk());
+        offer.setShowOrganizerDiscord(requestDto.getShowOrganizerContacts() && requestDto.getShowOrganizerDiscord());
+        offer.setScreenshotBucket(requestDto.getScreenshotBucket());
+        offer.setScreenshotObjectKey(requestDto.getScreenshotObjectKey());
+        offer.setRequiredParticipants(requestDto.getRequiredParticipants());
+        offer.setReserveParticipants(requestDto.getReserveParticipants());
+        offer.setAutoApproveEnabled(requestDto.getAutoApproveEnabled());
+        offer.setPlannedStartAt(requestDto.getPlannedStartAt());
+        offer.setPlannedEndAt(requestDto.getPlannedEndAt());
         offer.setUpdatedAt(OffsetDateTime.now(clock));
 
         return jointPurchaseOfferRepository.save(offer);
