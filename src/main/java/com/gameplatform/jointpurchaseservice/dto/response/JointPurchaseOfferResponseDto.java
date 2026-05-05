@@ -30,6 +30,8 @@ public class JointPurchaseOfferResponseDto {
     private String organizerTelegramUsername;
     private String organizerVkUsername;
     private String organizerDiscordUsername;
+    private Integer participantsEmailSendCount;
+    private OffsetDateTime nextParticipantsEmailAllowedAt;
     private String screenshotBucket;
     private String screenshotObjectKey;
     private String screenshotUrl;

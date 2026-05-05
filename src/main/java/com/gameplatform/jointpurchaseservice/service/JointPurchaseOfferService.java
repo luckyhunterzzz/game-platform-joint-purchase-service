@@ -65,6 +65,8 @@ public class JointPurchaseOfferService {
                 .showOrganizerTelegram(requestDto.getShowOrganizerContacts() && requestDto.getShowOrganizerTelegram())
                 .showOrganizerVk(requestDto.getShowOrganizerContacts() && requestDto.getShowOrganizerVk())
                 .showOrganizerDiscord(requestDto.getShowOrganizerContacts() && requestDto.getShowOrganizerDiscord())
+                .participantsEmailSendCount(0)
+                .lastParticipantsEmailSentAt(null)
                 .screenshotBucket(requestDto.getScreenshotBucket())
                 .screenshotObjectKey(requestDto.getScreenshotObjectKey())
                 .requiredParticipants(requestDto.getRequiredParticipants())

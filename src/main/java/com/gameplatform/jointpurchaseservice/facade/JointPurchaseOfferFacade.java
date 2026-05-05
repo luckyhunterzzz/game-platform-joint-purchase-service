@@ -227,6 +227,11 @@ public class JointPurchaseOfferFacade {
                 responseDto.setOrganizerDiscordUsername(null);
             }
         }
+
+        responseDto.setParticipantsEmailSendCount(offer.getParticipantsEmailSendCount());
+        responseDto.setNextParticipantsEmailAllowedAt(
+                jointPurchaseNotificationService.getNextParticipantsEmailAllowedAt(offer)
+        );
         return responseDto;
     }
 }

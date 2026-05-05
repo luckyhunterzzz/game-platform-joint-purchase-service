@@ -58,6 +58,12 @@ public class JointPurchaseOffer {
     @Column(name = "show_organizer_discord", nullable = false)
     private Boolean showOrganizerDiscord;
 
+    @Column(name = "participants_email_send_count", nullable = false)
+    private Integer participantsEmailSendCount;
+
+    @Column(name = "last_participants_email_sent_at")
+    private OffsetDateTime lastParticipantsEmailSentAt;
+
     @Column(name = "required_participants", nullable = false)
     private Integer requiredParticipants;
 
