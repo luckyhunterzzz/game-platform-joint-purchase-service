@@ -17,5 +17,10 @@ public interface JointPurchaseOfferRepository extends JpaRepository<JointPurchas
 
     List<JointPurchaseOffer> findAllByIdInOrderByCreatedAtDesc(List<UUID> ids);
 
+    List<JointPurchaseOffer> findAllByStatusInAndPlannedEndAtBeforeOrderByPlannedEndAtAsc(
+            List<JointPurchaseOfferStatus> statuses,
+            java.time.OffsetDateTime plannedEndAt
+    );
+
     boolean existsByOrganizerUserIdAndStatusIn(UUID organizerUserId, List<JointPurchaseOfferStatus> statuses);
 }

@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Arrays;
@@ -227,10 +228,51 @@ public class JointPurchaseOfferService {
                 .orElseThrow(() -> new NotFoundException("Offer not found: " + offerId));
     }
 
+    @Transactional
+    public void autoCancelExpiredOffers() {
+        OffsetDateTime cutoff = OffsetDateTime.now(clock).minusHours(12);
+        List<JointPurchaseOffer> expiredOffers =
+                jointPurchaseOfferRepository.findAllByStatusInAndPlannedEndAtBeforeOrderByPlannedEndAtAsc(
+                        List.of(
+                                JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS,
+                                JointPurchaseOfferStatus.MAIN_GROUP_FILLED,
+                                JointPurchaseOfferStatus.READY_TO_START,
+                                JointPurchaseOfferStatus.IN_PROGRESS
+                        ),
+                        cutoff
+                );
+
+        if (expiredOffers.isEmpty()) {
+            return;
+        }
+
+        expiredOffers.forEach(offer -> {
+            completeOrReleaseParticipantsIfNeeded(offer, JointPurchaseOfferStatus.CANCELLED);
+            offer.setStatus(JointPurchaseOfferStatus.CANCELLED);
+            offer.setUpdatedAt(OffsetDateTime.now(clock));
+        });
+
+        jointPurchaseOfferRepository.saveAll(expiredOffers);
+    }
+
     private void validatePlannedWindow(CreateJointPurchaseOfferRequestDto requestDto) {
+        OffsetDateTime now = OffsetDateTime.now(clock).truncatedTo(ChronoUnit.MINUTES);
+
+        if (!requestDto.getPlannedStartAt().isAfter(now)) {
+            throw new BadRequestException("plannedStartAt must be in the future");
+        }
+
+        if (requestDto.getPlannedStartAt().isAfter(now.plusHours(48))) {
+            throw new BadRequestException("plannedStartAt cannot be later than 48 hours from now");
+        }
+
         if (requestDto.getPlannedEndAt().isBefore(requestDto.getPlannedStartAt())
                 || requestDto.getPlannedEndAt().isEqual(requestDto.getPlannedStartAt())) {
             throw new BadRequestException("plannedEndAt must be after plannedStartAt");
+        }
+
+        if (requestDto.getPlannedEndAt().isAfter(requestDto.getPlannedStartAt().plusHours(48))) {
+            throw new BadRequestException("plannedEndAt cannot be later than 48 hours after plannedStartAt");
         }
     }
 
