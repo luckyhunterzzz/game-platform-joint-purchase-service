@@ -36,6 +36,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class ParticipationApplicationService {
 
+    private static final List<ParticipationApplicationStatus> ACTIVE_APPLICATION_STATUSES = List.of(
+            ParticipationApplicationStatus.PENDING_TRUST_CHECK,
+            ParticipationApplicationStatus.PENDING_ORGANIZER_REVIEW,
+            ParticipationApplicationStatus.APPROVED_MAIN,
+            ParticipationApplicationStatus.APPROVED_RESERVE
+    );
+
     private final ParticipationApplicationRepository participationApplicationRepository;
     private final JointPurchaseOfferRepository jointPurchaseOfferRepository;
     private final JointPurchaseParticipantRepository jointPurchaseParticipantRepository;
@@ -56,7 +63,8 @@ public class ParticipationApplicationService {
         JointPurchaseOffer offer = jointPurchaseOfferRepository.findById(offerId)
                 .orElseThrow(() -> new NotFoundException("Offer not found: " + offerId));
 
-        if (offer.getStatus() != JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS) {
+        if (offer.getStatus() != JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS
+                && offer.getStatus() != JointPurchaseOfferStatus.MAIN_GROUP_FILLED) {
             throw new ConflictException("Applications are not accepted for this offer");
         }
 
@@ -64,7 +72,11 @@ public class ParticipationApplicationService {
             throw new ForbiddenException("Organizer cannot participate in their own joint purchase");
         }
 
-        if (participationApplicationRepository.existsByOfferIdAndApplicantUserId(offerId, applicantUserId)) {
+        if (participationApplicationRepository.existsByOfferIdAndApplicantUserIdAndStatusIn(
+                offerId,
+                applicantUserId,
+                ACTIVE_APPLICATION_STATUSES
+        )) {
             throw new ConflictException("Application already exists for this user and offer");
         }
 
@@ -78,6 +90,18 @@ public class ParticipationApplicationService {
                 )
         )) {
             throw new ConflictException("Organizer cannot participate while having an active joint purchase offer");
+        }
+
+        if (jointPurchaseParticipantRepository.existsByUserIdInActiveMainOffers(
+                applicantUserId,
+                List.of(
+                        JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS.name(),
+                        JointPurchaseOfferStatus.MAIN_GROUP_FILLED.name(),
+                        JointPurchaseOfferStatus.READY_TO_START.name(),
+                        JointPurchaseOfferStatus.IN_PROGRESS.name()
+                )
+        )) {
+            throw new ConflictException("User already has active MAIN participation");
         }
 
         if (!playerProfileClient.isProfileComplete(applicantUserId, applicantEmail)) {
@@ -130,7 +154,11 @@ public class ParticipationApplicationService {
 
     @Transactional(readOnly = true)
     public ParticipationApplication getCurrentUserApplication(UUID offerId, UUID applicantUserId) {
-        return participationApplicationRepository.findByOfferIdAndApplicantUserId(offerId, applicantUserId)
+        return participationApplicationRepository.findFirstByOfferIdAndApplicantUserIdAndStatusInOrderByUpdatedAtDesc(
+                        offerId,
+                        applicantUserId,
+                        ACTIVE_APPLICATION_STATUSES
+                )
                 .orElse(null);
     }
 
@@ -280,6 +308,57 @@ public class ParticipationApplicationService {
                 organizerUserId,
                 OffsetDateTime.now(clock)
         );
+
+        jointPurchaseParticipantRepository.save(participant);
+        jointPurchaseOfferRepository.save(offer);
+        return participationApplicationRepository.save(application);
+    }
+
+    @Transactional
+    public ParticipationApplication cancelApprovedApplication(
+            UUID organizerUserId,
+            UUID offerId,
+            UUID applicationId
+    ) {
+        JointPurchaseOffer offer = getOfferAndAssertOwnership(organizerUserId, offerId);
+        ParticipationApplication application = getApplicationAndAssertOffer(offerId, applicationId);
+
+        if (offer.getStatus() != JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS
+                && offer.getStatus() != JointPurchaseOfferStatus.MAIN_GROUP_FILLED) {
+            throw new ConflictException("Approved applications can be cancelled only before the purchase is ready");
+        }
+
+        if (application.getStatus() != ParticipationApplicationStatus.APPROVED_MAIN
+                && application.getStatus() != ParticipationApplicationStatus.APPROVED_RESERVE) {
+            throw new ConflictException("Only approved applications can be cancelled by organizer");
+        }
+
+        JointPurchaseParticipant participant = jointPurchaseParticipantRepository
+                .findByApplicationIdAndStatus(applicationId, JointPurchaseParticipantStatus.ACTIVE)
+                .orElseThrow(() -> new NotFoundException("Active participant not found for application: " + applicationId));
+
+        OffsetDateTime now = OffsetDateTime.now(clock);
+
+        if (participant.getParticipationType() == ParticipationType.MAIN) {
+            offer.setCurrentMainParticipants(Math.max(0, offer.getCurrentMainParticipants() - 1));
+            if (offer.getStatus() == JointPurchaseOfferStatus.MAIN_GROUP_FILLED
+                    && offer.getCurrentMainParticipants() < offer.getRequiredParticipants()) {
+                offer.setStatus(JointPurchaseOfferStatus.OPEN_FOR_APPLICATIONS);
+            }
+        } else {
+            offer.setCurrentReserveParticipants(Math.max(0, offer.getCurrentReserveParticipants() - 1));
+        }
+
+        participant.setStatus(JointPurchaseParticipantStatus.REMOVED);
+        participant.setUpdatedAt(now);
+
+        application.setStatus(ParticipationApplicationStatus.CANCELLED);
+        application.setAssignedParticipationType(null);
+        application.setReviewedByUserId(organizerUserId);
+        application.setReviewedAt(now);
+        application.setUpdatedAt(now);
+
+        offer.setUpdatedAt(now);
 
         jointPurchaseParticipantRepository.save(participant);
         jointPurchaseOfferRepository.save(offer);

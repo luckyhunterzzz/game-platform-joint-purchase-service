@@ -2,6 +2,7 @@ package com.gameplatform.jointpurchaseservice.service;
 
 import com.gameplatform.jointpurchaseservice.domain.entity.JointPurchaseOffer;
 import com.gameplatform.jointpurchaseservice.domain.entity.JointPurchaseParticipant;
+import com.gameplatform.jointpurchaseservice.domain.enums.ParticipationType;
 import com.gameplatform.jointpurchaseservice.domain.enums.JointPurchaseParticipantStatus;
 import com.gameplatform.jointpurchaseservice.dto.request.SendOfferParticipantsEmailRequestDto;
 import com.gameplatform.jointpurchaseservice.dto.response.OfferParticipantsEmailResponseDto;
@@ -12,12 +13,14 @@ import com.gameplatform.jointpurchaseservice.integration.playerprofile.PlayerPro
 import com.gameplatform.jointpurchaseservice.kafka.event.EmailNotificationRecipientEvent;
 import com.gameplatform.jointpurchaseservice.kafka.event.JointPurchaseParticipantsEmailRequestedEvent;
 import com.gameplatform.jointpurchaseservice.kafka.producer.NotificationEventProducer;
+import com.gameplatform.jointpurchaseservice.repository.jpa.JointPurchaseOfferRepository;
 import com.gameplatform.jointpurchaseservice.repository.jpa.JointPurchaseParticipantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,12 +31,13 @@ import java.util.UUID;
 public class JointPurchaseNotificationService {
 
     private final JointPurchaseOfferService jointPurchaseOfferService;
+    private final JointPurchaseOfferRepository jointPurchaseOfferRepository;
     private final JointPurchaseParticipantRepository jointPurchaseParticipantRepository;
     private final PlayerProfileClient playerProfileClient;
     private final NotificationEventProducer notificationEventProducer;
     private final Clock clock;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public OfferParticipantsEmailResponseDto sendOfferParticipantsEmail(
             UUID organizerUserId,
             String organizerEmail,
@@ -44,6 +48,21 @@ public class JointPurchaseNotificationService {
 
         if (!offer.getOrganizerUserId().equals(organizerUserId)) {
             throw new ForbiddenException("Only the creator can notify offer participants");
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        OffsetDateTime nextAllowedAt = getNextParticipantsEmailAllowedAt(offer);
+
+        if (nextAllowedAt != null && now.isBefore(nextAllowedAt)) {
+            long retryAfterSeconds = Duration.between(now, nextAllowedAt).getSeconds();
+            throw new BadRequestException("Participants email cooldown is active. Retry after " + retryAfterSeconds + " seconds");
+        }
+
+        boolean sendToMain = Boolean.TRUE.equals(requestDto.getSendToMain());
+        boolean sendToReserve = Boolean.TRUE.equals(requestDto.getSendToReserve());
+
+        if (!sendToMain && !sendToReserve) {
+            throw new BadRequestException("At least one recipient group must be selected");
         }
 
         List<JointPurchaseParticipant> participants =
@@ -59,6 +78,14 @@ public class JointPurchaseNotificationService {
         List<EmailNotificationRecipientEvent> recipients = new ArrayList<>();
 
         for (JointPurchaseParticipant participant : participants) {
+            if (participant.getParticipationType() == ParticipationType.MAIN && !sendToMain) {
+                continue;
+            }
+
+            if (participant.getParticipationType() == ParticipationType.RESERVE && !sendToReserve) {
+                continue;
+            }
+
             PlayerProfileResponse profile = playerProfileClient.getProfileByUserId(participant.getUserId());
 
             if (profile.email() == null || profile.email().isBlank()) {
@@ -79,7 +106,6 @@ public class JointPurchaseNotificationService {
             throw new BadRequestException("No participant emails are available for delivery");
         }
 
-        OffsetDateTime now = OffsetDateTime.now(clock);
         UUID eventId = UUID.randomUUID();
 
         JointPurchaseParticipantsEmailRequestedEvent event =
@@ -97,12 +123,36 @@ public class JointPurchaseNotificationService {
 
         notificationEventProducer.publishJointPurchaseParticipantsEmailRequested(event);
 
+        offer.setParticipantsEmailSendCount((offer.getParticipantsEmailSendCount() == null ? 0 : offer.getParticipantsEmailSendCount()) + 1);
+        offer.setLastParticipantsEmailSentAt(now);
+        jointPurchaseOfferRepository.saveAndFlush(offer);
+
         return OfferParticipantsEmailResponseDto.builder()
                 .eventId(eventId)
                 .offerId(offer.getId())
                 .recipientsCount(recipients.size())
                 .requestedAt(now)
                 .build();
+    }
+
+    public OffsetDateTime getNextParticipantsEmailAllowedAt(JointPurchaseOffer offer) {
+        if (offer.getLastParticipantsEmailSentAt() == null || offer.getParticipantsEmailSendCount() == null || offer.getParticipantsEmailSendCount() <= 0) {
+            return null;
+        }
+
+        return offer.getLastParticipantsEmailSentAt().plus(resolveParticipantsEmailCooldown(offer.getParticipantsEmailSendCount()));
+    }
+
+    private Duration resolveParticipantsEmailCooldown(int sendCount) {
+        if (sendCount <= 1) {
+            return Duration.ofMinutes(1);
+        }
+
+        if (sendCount == 2) {
+            return Duration.ofMinutes(3);
+        }
+
+        return Duration.ofMinutes(5);
     }
 
     private String resolveDisplayName(PlayerProfileResponse profile) {

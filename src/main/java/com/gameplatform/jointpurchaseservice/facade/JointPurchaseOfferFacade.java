@@ -65,6 +65,19 @@ public class JointPurchaseOfferFacade {
                 .toList();
     }
 
+    public JointPurchaseOfferResponseDto updateOffer(
+            UUID organizerUserId,
+            UUID offerId,
+            CreateJointPurchaseOfferRequestDto requestDto
+    ) {
+        JointPurchaseOffer offer = jointPurchaseOfferService.updateOffer(
+                organizerUserId,
+                offerId,
+                requestDto
+        );
+        return enrichOfferResponse(jointPurchaseOfferMapper.toResponseDto(offer), offer);
+    }
+
     public JointPurchaseOfferResponseDto updateOfferStatus(
             UUID organizerUserId,
             UUID offerId,
@@ -174,6 +187,20 @@ public class JointPurchaseOfferFacade {
         );
     }
 
+    public ParticipationApplicationResponseDto cancelApprovedApplication(
+            UUID organizerUserId,
+            UUID offerId,
+            UUID applicationId
+    ) {
+        return participationApplicationMapper.toResponseDto(
+                participationApplicationService.cancelApprovedApplication(
+                        organizerUserId,
+                        offerId,
+                        applicationId
+                )
+        );
+    }
+
     public List<ParticipantFeedbackResponseDto> getOfferFeedback(UUID organizerUserId, UUID offerId) {
         return participantFeedbackService.getOfferFeedback(organizerUserId, offerId).stream()
                 .map(participantFeedbackMapper::toResponseDto)
@@ -204,6 +231,34 @@ public class JointPurchaseOfferFacade {
                 offer.getScreenshotBucket(),
                 offer.getScreenshotObjectKey()
         ));
+
+        if (Boolean.TRUE.equals(offer.getShowOrganizerContacts())) {
+            try {
+                PlayerProfileResponse organizerProfile = playerProfileClient.getProfileByUserId(offer.getOrganizerUserId());
+                responseDto.setOrganizerGameNickname(
+                        Boolean.TRUE.equals(offer.getShowOrganizerGameNickname()) ? organizerProfile.currentGameNickname() : null
+                );
+                responseDto.setOrganizerTelegramUsername(
+                        Boolean.TRUE.equals(offer.getShowOrganizerTelegram()) ? organizerProfile.telegramUsername() : null
+                );
+                responseDto.setOrganizerVkUsername(
+                        Boolean.TRUE.equals(offer.getShowOrganizerVk()) ? organizerProfile.vkUsername() : null
+                );
+                responseDto.setOrganizerDiscordUsername(
+                        Boolean.TRUE.equals(offer.getShowOrganizerDiscord()) ? organizerProfile.discordUsername() : null
+                );
+            } catch (RuntimeException ignored) {
+                responseDto.setOrganizerGameNickname(null);
+                responseDto.setOrganizerTelegramUsername(null);
+                responseDto.setOrganizerVkUsername(null);
+                responseDto.setOrganizerDiscordUsername(null);
+            }
+        }
+
+        responseDto.setParticipantsEmailSendCount(offer.getParticipantsEmailSendCount());
+        responseDto.setNextParticipantsEmailAllowedAt(
+                jointPurchaseNotificationService.getNextParticipantsEmailAllowedAt(offer)
+        );
         return responseDto;
     }
 }
