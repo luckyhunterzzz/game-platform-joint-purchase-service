@@ -53,6 +53,15 @@ public class JointPurchaseOfferController {
         return ResponseEntity.ok(jointPurchaseOfferFacade.getOrganizerOffers(organizerUserId));
     }
 
+    @PutMapping("/{offerId}")
+    public ResponseEntity<JointPurchaseOfferResponseDto> updateOffer(
+            @RequestHeader(HeaderNames.USER_ID) UUID organizerUserId,
+            @PathVariable UUID offerId,
+            @Valid @RequestBody CreateJointPurchaseOfferRequestDto requestDto
+    ) {
+        return ResponseEntity.ok(jointPurchaseOfferFacade.updateOffer(organizerUserId, offerId, requestDto));
+    }
+
     @PatchMapping("/{offerId}/status")
     public ResponseEntity<JointPurchaseOfferResponseDto> updateOfferStatus(
             @RequestHeader(HeaderNames.USER_ID) UUID organizerUserId,
@@ -153,6 +162,17 @@ public class JointPurchaseOfferController {
                         applicationId,
                         requestDto
                 )
+        );
+    }
+
+    @DeleteMapping("/{offerId}/applications/{applicationId}")
+    public ResponseEntity<ParticipationApplicationResponseDto> cancelApprovedApplication(
+            @RequestHeader(HeaderNames.USER_ID) UUID organizerUserId,
+            @PathVariable UUID offerId,
+            @PathVariable UUID applicationId
+    ) {
+        return ResponseEntity.ok(
+                jointPurchaseOfferFacade.cancelApprovedApplication(organizerUserId, offerId, applicationId)
         );
     }
 
